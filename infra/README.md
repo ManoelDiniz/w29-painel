@@ -18,13 +18,25 @@ No servidor:
 chmod +x provision-ubuntu.sh
 
 ./provision-ubuntu.sh \
-    --chave "$(cat ~/.ssh/id_ed25519.pub)" \
     --banco w29 \
     --api w29-painel \
     --api-git git@github.com:ManoelDiniz/w29-painel.git \
     --api-dominio api.mnvma.com \
     --ssl
 ```
+
+Repare que **não tem `--chave`**. Não é esquecimento: numa VPS de nuvem a sua
+chave já está em `/root/.ssh/authorized_keys` — é por ela que você acabou de
+entrar como root — e o script a copia de lá para o usuário `ubuntu` sozinho.
+
+Escrever `--chave "$(cat ~/.ssh/id_ed25519.pub)"` aqui seria uma armadilha:
+este bloco roda **no servidor**, onde `~` é o home do root da VPS e esse
+arquivo não existe. O `cat` falharia, o valor chegaria vazio, e o script
+recusaria dizendo que falta a chave — enquanto a chave certa está ali do
+lado, no `authorized_keys`.
+
+Use `--chave` só para instalar uma chave **diferente** da que você está
+usando agora, colando o conteúdo dela entre aspas.
 
 Isso entrega, numa passada: usuário `ubuntu` com chave, SSH sem senha, UFW,
 fail2ban, nginx, redis, **MySQL com o banco `w29` já criado**, o serviço
