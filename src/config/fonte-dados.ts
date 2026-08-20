@@ -1,12 +1,18 @@
+// PRIMEIRA linha do arquivo, e por um motivo específico: `import` é içado.
+//
+// A CLI do TypeORM roda fora do Nest, então ninguém carregou o .env por ela.
+// A versão óbvia disto era importar `config` do dotenv e chamá-la mais abaixo
+// — só que aí o `import { env } from './env'` já teria executado, lido um
+// process.env vazio, e o processo morreria dizendo que JWT_SEGREDO não está
+// definida com o .env preenchido do lado. `import 'dotenv/config'` resolve
+// porque carrega como EFEITO do import, na ordem em que os imports rodam.
+import 'dotenv/config'
 import 'reflect-metadata'
-import { config as carregarEnv } from 'dotenv'
+
 import { DataSource, type DataSourceOptions } from 'typeorm'
 
 import { env } from './env'
 import { TODAS_ENTIDADES } from '../entidades/lista'
-
-// A CLI do TypeORM roda fora do Nest, então ninguém carregou o .env por ela.
-carregarEnv()
 
 /**
  * `synchronize` fica desligado de propósito, e não por precaução exagerada:
