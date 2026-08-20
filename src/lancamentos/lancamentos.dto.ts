@@ -131,3 +131,19 @@ export class DiariasNoDiaDto {
   @Validate(DataISO)
   data!: string
 }
+
+/**
+ * O período que o admin quer olhar na tela de produção.
+ *
+ * Só datas: o atalho de "7 dias / 15 dias / 30 dias" é conta da tela, que
+ * sabe que dia é hoje no fuso de quem está olhando. Se o atalho virasse
+ * parâmetro aqui, "hoje" passaria a ser o dia do servidor — e às 21h em São
+ * Paulo o servidor em UTC já está no dia seguinte.
+ */
+export class PeriodoDto {
+  @Validate(DataISO)
+  de!: string
+
+  @Validate(DataISO)
+  ate!: string
+}

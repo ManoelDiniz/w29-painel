@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common'
 
-import { UsuarioAtual, type UsuarioDaSessao } from '../auth/decoradores'
+import { SoAdmin, UsuarioAtual, type UsuarioDaSessao } from '../auth/decoradores'
 import { TIPOS_LANCAMENTO, type TipoLancamento } from '../entidades'
 import {
   DiariasNoDiaDto,
@@ -19,6 +19,7 @@ import {
   LancarGastoDto,
   LancarProducaoDto,
   MeusLancamentosDto,
+  PeriodoDto,
 } from './lancamentos.dto'
 import { LancamentosService } from './lancamentos.service'
 
@@ -39,6 +40,19 @@ export class LancamentosController {
   @Get('meus')
   meus(@Query() dto: MeusLancamentosDto, @UsuarioAtual() usuario: UsuarioDaSessao) {
     return this.servico.meus(dto, usuario)
+  }
+
+  /**
+   * Tudo o que foi lançado num período, de todo mundo.
+   *
+   * @SoAdmin() aqui e não na classe: as outras rotas deste controller são o
+   * trabalho do operador. Esta é a única que atravessa o que os outros
+   * lançaram — e devolve receita, comissão e diária de colega junto.
+   */
+  @SoAdmin()
+  @Get('periodo')
+  periodo(@Query() dto: PeriodoDto) {
+    return this.servico.periodo(dto)
   }
 
   @Get('diarias-no-dia')

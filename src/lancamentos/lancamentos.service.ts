@@ -5,6 +5,7 @@ import { DataSource, Repository } from 'typeorm'
 
 import type { UsuarioDaSessao } from '../auth/decoradores'
 import { diasAtras, hoje } from '../comum/datas'
+import { paraCentavos, paraDecimal } from '../comum/dinheiro'
 import { ErroDeRegra } from '../comum/erros'
 import {
   CategoriaGasto,
@@ -25,8 +26,25 @@ import type {
   LancarGastoDto,
   LancarProducaoDto,
   MeusLancamentosDto,
+  PeriodoDto,
 } from './lancamentos.dto'
 import { RateioService } from './rateio.service'
+
+/** Uma linha da tela de produção do admin. Dinheiro em string, como no banco. */
+type LancamentoDoPeriodo = {
+  id: string
+  tipo: TipoLancamento
+  data: string
+  titulo: string
+  subtitulo: string | null
+  obra: string | null
+  /** O que a empresa PAGA por esta linha: comissão, diária ou gasto. */
+  custo: string
+  /** O que a empresa RECEBE. Só produção tem; diária e gasto vêm zeradas. */
+  receita: string
+  lancadoPor: string
+  criadoEm: string
+}
 
 /**
  * O que o operador pode fazer.
@@ -375,6 +393,99 @@ export class LancamentosService {
       `,
       [usuario.id, desde, usuario.id, desde, usuario.id, desde],
     )
+  }
+
+  /**
+   * TUDO o que foi lançado num período, por quem quer que seja.
+   *
+   * É a resposta para a pergunta que `meus` não responde: aquela mostra o
+   * que EU lancei, para eu conferir e corrigir meu próprio erro do dia. Esta
+   * mostra o que a empresa lançou — e por isso é só do admin.
+   *
+   * Traz também quem lançou. Sem isso, ver um número estranho no meio de
+   * duzentas linhas não leva a lugar nenhum: dá para saber que está errado,
+   * não com quem conversar.
+   */
+  async periodo(dto: PeriodoDto) {
+    const lancamentos: LancamentoDoPeriodo[] = await this.dataSource.query(
+      `
+      SELECT id, tipo, data, titulo, subtitulo, obra, custo, receita, lancadoPor, criadoEm FROM (
+        SELECT p.id,
+               'producao' AS tipo,
+               p.data,
+               CONCAT(
+                 s.nome, ' — ',
+                 FORMAT(p.quantidade, 2, 'de_DE'), ' ',
+                 CASE p.unidade
+                   WHEN 'm2'           THEN 'm²'
+                   WHEN 'metro_linear' THEN 'm'
+                   ELSE                     'un'
+                 END
+               ) AS titulo,
+               COALESCE(f.nome, e.nome) AS subtitulo,
+               o.nome AS obra,
+               -- Soma dos rateios, e não quantidade × unitário: turma só de
+               -- diaristas tem rateio vazio, porque o custo deles é a diária.
+               (SELECT COALESCE(SUM(r.valor), 0) FROM producao_rateios r WHERE r.producaoId = p.id) AS custo,
+               p.valorVendaTotal AS receita,
+               u.nome AS lancadoPor,
+               p.criadoEm
+          FROM producoes p
+          JOIN servicos s          ON s.id = p.servicoId
+          JOIN obras o             ON o.id = p.obraId
+          JOIN usuarios u          ON u.id = p.criadoPor
+          LEFT JOIN funcionarios f ON f.id = p.funcionarioId
+          LEFT JOIN equipes e      ON e.id = p.equipeId
+         WHERE p.data BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT d.id, 'diaria', d.data, 'Diária', f.nome, NULL, d.valor, 0, u.nome, d.criadoEm
+          FROM diarias d
+          JOIN funcionarios f ON f.id = d.funcionarioId
+          JOIN usuarios u     ON u.id = d.criadoPor
+         WHERE d.data BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT g.id, 'gasto', g.data, g.descricao, c.nome, o.nome, g.valor, 0, u.nome, g.criadoEm
+          FROM gastos g
+          JOIN categorias_gasto c ON c.id = g.categoriaId
+          JOIN obras o            ON o.id = g.obraId
+          JOIN usuarios u         ON u.id = g.criadoPor
+         WHERE g.data BETWEEN ? AND ?
+      ) t
+      ORDER BY t.data DESC, t.criadoEm DESC
+      `,
+      [dto.de, dto.ate, dto.de, dto.ate, dto.de, dto.ate],
+    )
+
+    // Somado aqui e não no SQL: são as mesmas linhas que já vieram, e um
+    // segundo SELECT com os mesmos filtros é mais uma chance de os dois
+    // discordarem quando alguém mexer num deles.
+    const zero = { producao: 0, diaria: 0, gasto: 0, receita: 0 }
+    const totais = lancamentos.reduce((soma, l) => {
+      soma[l.tipo] = soma[l.tipo] + paraCentavos(l.custo)
+      soma.receita += paraCentavos(l.receita)
+      return soma
+    }, { ...zero })
+
+    return {
+      lancamentos,
+      totais: {
+        receita: paraDecimal(totais.receita),
+        maoDeObra: paraDecimal(totais.producao),
+        diarias: paraDecimal(totais.diaria),
+        gastos: paraDecimal(totais.gasto),
+        // O que sobra depois de pagar quem trabalhou e o que se comprou.
+        // Não é lucro: falta tudo o que não passa por lançamento (aluguel,
+        // combustível fora de obra, imposto).
+        margem: paraDecimal(
+          totais.receita - totais.producao - totais.diaria - totais.gasto,
+        ),
+      },
+      quantidade: lancamentos.length,
+    }
   }
 
   /**
