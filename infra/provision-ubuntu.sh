@@ -787,6 +787,16 @@ install -d -o "$USUARIO" -g "$USUARIO" /var/log/deploy
 if [[ "$API_MODO" == "bare" ]]; then
     install -d -o "$USUARIO" -g "$USUARIO" /var/repo
 
+    # Vindo de um provisionamento anterior com --api-git, sobra aqui o .git
+    # que aquele modo criou. Ele não atrapalha o checkout (que usa --git-dir
+    # explícito), mas faz `git log` dentro do diretório responder pelo
+    # repositório errado — o antigo, vazio — e a linha do commit publicado
+    # sairia mentindo.
+    if [[ -d "${API_ATUAL}/.git" ]]; then
+        rm -rf "${API_ATUAL}/.git"
+        ok "removido o .git deixado por um provisionamento no modo git"
+    fi
+
     if [[ ! -d "$API_REPO" ]]; then
         sudo -u "$USUARIO" git init --bare "$API_REPO" >/dev/null
         ok "repositório bare criado em $API_REPO"
@@ -914,6 +924,7 @@ cat > "$API_PUBLICAR" <<PUB
 set -euo pipefail
 
 APP_DIR="${API_ATUAL}"
+GIT_DIR="${API_REPO}"
 BRANCH="${API_BRANCH}"
 SERVICO="${API}"
 PORTA="${API_PORTA}"
@@ -940,7 +951,17 @@ if [[ "\${1:-}" != "--local" && "\$MODO" == "git" ]]; then
     git reset --hard "origin/\$BRANCH"
 fi
 
-echo ">> commit \$(git rev-parse --short HEAD) — \$(git log -1 --pretty=%s)"
+# No modo bare o diretório de trabalho NÃO tem .git próprio: o histórico vive
+# no repositório bare, e o checkout chega aqui por --work-tree. Perguntar de
+# dentro de APP_DIR responderia "not a git repository" e esta linha — a única
+# que diz o que foi publicado — sairia vazia bem na hora em que você precisa
+# saber qual commit está no ar.
+if [[ "\$MODO" == "bare" ]]; then
+    COMMIT="\$(git --git-dir="\$GIT_DIR" log -1 --pretty='%h %s' "\$BRANCH" 2>/dev/null || echo desconhecido)"
+else
+    COMMIT="\$(git log -1 --pretty='%h %s' 2>/dev/null || echo desconhecido)"
+fi
+echo ">> commit \$COMMIT"
 
 if [[ ! -f .env ]]; then
     echo ">> .env AUSENTE em \$APP_DIR — código publicado, build e migration pulados."

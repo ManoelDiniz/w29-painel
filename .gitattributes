@@ -1,0 +1,12 @@
+# Shell script existe para rodar em Linux.
+#
+# Com core.autocrlf=true (o padrão de muita instalação Windows), o checkout
+# entrega CRLF. Aí o \r fica colado no fim de cada linha e o bash do servidor
+# recusa `set -euo pipefail` com "invalid option name" — um erro na linha 83
+# que não tem relação visível nenhuma com quebra de linha, e que só aparece
+# depois do scp, longe da máquina onde o arquivo foi editado.
+*.sh text eol=lf
+
+# Mesma história: o hook e o .env são lidos por programas Unix.
+*.env       text eol=lf
+.gitignore  text eol=lf
