@@ -1,0 +1,38 @@
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator'
+import { Transform } from 'class-transformer'
+
+/**
+ * As mensagens são as que aparecem na tela. Escrevê-las aqui, junto da
+ * regra, é o que impede a validação e o texto de saírem de sincronia —
+ * mudar o mínimo da senha sem mudar o aviso é um erro fácil de cometer
+ * quando os dois moram em arquivos diferentes.
+ */
+
+export class EntrarDto {
+  @Transform(({ value }) => String(value ?? '').trim().toLowerCase())
+  @IsEmail({}, { message: 'E-mail inválido.' })
+  email!: string
+
+  @IsString({ message: 'Preencha a senha.' })
+  @MinLength(1, { message: 'Preencha a senha.' })
+  senha!: string
+}
+
+export class CadastrarDto {
+  @Transform(({ value }) => String(value ?? '').trim())
+  @IsString({ message: 'Diga seu nome.' })
+  @MinLength(1, { message: 'Diga seu nome.' })
+  @MaxLength(160, { message: 'O nome ficou longo demais.' })
+  nome!: string
+
+  @Transform(({ value }) => String(value ?? '').trim().toLowerCase())
+  @IsEmail({}, { message: 'E-mail inválido.' })
+  email!: string
+
+  // Seis é o mínimo que o Supabase exigia. Mantido para não invalidar a
+  // senha de ninguém na virada — quem já entrava continua entrando.
+  @IsString({ message: 'Defina uma senha.' })
+  @MinLength(6, { message: 'A senha precisa ter pelo menos 6 caracteres.' })
+  @MaxLength(72, { message: 'A senha pode ter no máximo 72 caracteres.' })
+  senha!: string
+}
