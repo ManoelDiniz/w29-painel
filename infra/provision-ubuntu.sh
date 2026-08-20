@@ -859,6 +859,14 @@ Description=${API} — API Node
 After=network.target mysql.service
 Wants=mysql.service
 
+# Estas duas vão em [Unit], e não em [Service] — o systemd ignora (com aviso
+# no journal) quando aparecem no lugar errado, e aí o limite simplesmente não
+# existe. Sem elas, uma falha na partida (o banco fora do ar, por exemplo)
+# vira um laço de reinício a cada 5s que enche o journal e enterra a causa
+# original entre milhares de linhas iguais.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
 [Service]
 Type=simple
 User=${USUARIO}
@@ -869,11 +877,6 @@ Environment=NODE_ENV=production
 ExecStart=/usr/bin/node dist/main.js
 Restart=always
 RestartSec=5
-
-# Sem isto, uma falha na partida (banco fora do ar, por exemplo) vira um laço
-# de reinício a cada 5s que enche o journal e esconde a causa original.
-StartLimitBurst=5
-StartLimitIntervalSec=60
 
 NoNewPrivileges=true
 PrivateTmp=true
