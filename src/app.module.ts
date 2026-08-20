@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { AuthModule } from './auth/auth.module'
 import { CadastrosModule } from './cadastros/cadastros.module'
 import { LancamentosModule } from './lancamentos/lancamentos.module'
+import { PagamentosModule } from './pagamentos/pagamentos.module'
 import { UsuariosModule } from './usuarios/usuarios.module'
 import { opcoesBanco } from './config/fonte-dados'
 import { SaudeController } from './saude.controller'
@@ -16,6 +17,7 @@ import { SaudeController } from './saude.controller'
     AuthModule,
     LancamentosModule,
     CadastrosModule,
+    PagamentosModule,
     UsuariosModule,
   ],
   controllers: [SaudeController],
