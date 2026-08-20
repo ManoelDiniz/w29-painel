@@ -180,9 +180,17 @@ export class PagamentosService {
     })
   }
 
-  /** O histórico, do mais recente para o mais antigo. */
+  /**
+   * O histórico, do mais recente para o mais antigo.
+   *
+   * Os COUNT voltam do mysql2 como STRING ('1', não 1) — DECIMAL e agregados
+   * chegam assim para não perder precisão em números grandes. Converter aqui
+   * e não na tela: quem consome não tem como adivinhar que dois campos
+   * numéricos vêm como texto, e `"1" === 1` é falso em silêncio. Foi
+   * exatamente isso que fez a tela escrever "1 comissões".
+   */
   async listar() {
-    return this.dataSource.query(`
+    const linhas: Record<string, unknown>[] = await this.dataSource.query(`
       SELECT pg.id,
              pg.valorTotal,
              pg.referenciaAte,
@@ -198,6 +206,12 @@ export class PagamentosService {
        ORDER BY pg.pagoEm DESC
        LIMIT 200
     `)
+
+    return linhas.map((l) => ({
+      ...l,
+      comissoes: Number(l.comissoes),
+      diarias: Number(l.diarias),
+    }))
   }
 
   /**
