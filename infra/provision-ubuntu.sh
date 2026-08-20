@@ -1148,7 +1148,30 @@ fi
 # ------------------------------------------------------------------ vhost
 
 API_SERVER_NAME="${API_DOMINIO:-_}"
-cat > "/etc/nginx/sites-available/${API}" <<VHOST
+API_VHOST="/etc/nginx/sites-available/${API}"
+
+# O certbot EDITA este arquivo: é nele que ele injeta o bloco 443, o caminho
+# do certificado e o redirect de 80 para 443. Sobrescrever sem olhar apaga
+# tudo isso — o script diz "vhost ativo", o nginx recarrega sem reclamar, e a
+# API volta a atender só em HTTP puro. Ninguém liga uma coisa à outra, porque
+# o provisionamento "deu certo".
+#
+# Então: existindo TLS aqui, o arquivo é deixado em paz.
+if [[ -f "$API_VHOST" ]] && grep -q "ssl_certificate" "$API_VHOST"; then
+    ok "vhost já tem TLS configurado — preservado (apague o arquivo para forçar reescrita)"
+
+    # Só que preservar também congela porta e domínio. Se algum deles mudou
+    # nesta execução, o vhost antigo continua valendo e a mudança some sem
+    # aviso — o que é pior que o clobber, porque é silencioso.
+    if ! grep -q "127.0.0.1:${API_PORTA}" "$API_VHOST"; then
+        aviso "o vhost preservado NÃO aponta para a porta ${API_PORTA}. Ajuste ${API_VHOST} à mão, ou apague o arquivo e rode de novo com --ssl."
+    fi
+    if [[ -n "$API_DOMINIO" ]] && ! grep -q "server_name.*${API_DOMINIO}" "$API_VHOST"; then
+        aviso "o vhost preservado NÃO atende ${API_DOMINIO}. Ajuste ${API_VHOST} à mão, ou apague o arquivo e rode de novo com --ssl."
+    fi
+else
+
+cat > "$API_VHOST" <<VHOST
 # Gerado por provision-ubuntu.sh
 server {
     listen 80;
@@ -1175,7 +1198,10 @@ server {
 }
 VHOST
 
-ln -sfn "/etc/nginx/sites-available/${API}" "/etc/nginx/sites-enabled/${API}"
+    ok "vhost escrito"
+fi
+
+ln -sfn "$API_VHOST" "/etc/nginx/sites-enabled/${API}"
 rm -f /etc/nginx/sites-enabled/default
 
 if nginx -t >/dev/null 2>&1; then
