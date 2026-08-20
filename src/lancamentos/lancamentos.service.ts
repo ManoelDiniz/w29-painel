@@ -45,6 +45,12 @@ import { RateioService } from './rateio.service'
  * operador não tinha SELECT nas tabelas com dinheiro. Aqui ela é humana —
  * mora nos SELECTs abaixo, que escolhem coluna por coluna. Ao mexer neles,
  * `SELECT *` é sempre a resposta errada.
+ *
+ * A EXCEÇÃO, e é uma só: o admin usa esta mesma tela, e para ele esconder a
+ * comissão não protege nada — ele a vê inteira no painel dele. Então `meus`
+ * devolve o valor quando quem pergunta é admin. A decisão é tomada a partir
+ * do papel que o guard leu do BANCO, nunca de um parâmetro da requisição;
+ * caso contrário bastaria pedir com outro corpo para virar admin.
  */
 @Injectable()
 export class LancamentosService {
@@ -301,6 +307,29 @@ export class LancamentosService {
   async meus(dto: MeusLancamentosDto, usuario: UsuarioDaSessao) {
     const desde = diasAtras(dto.dias)
 
+    /**
+     * O admin vê o dinheiro; o operador, não.
+     *
+     * Quem decide é o papel que veio do BANCO, no guard — não um parâmetro
+     * da requisição nem um campo do token. É o que impede alguém de pedir a
+     * versão com valores só porque descobriu o endereço da rota.
+     *
+     * A escolha entra na SQL como texto fixo, escrito aqui: são duas
+     * constantes do código, nunca algo digitado por quem chamou.
+     */
+    const ehAdmin = usuario.papel === 'admin'
+
+    // A comissão de uma produção é a SOMA DOS RATEIOS, não quantidade ×
+    // valor unitário. As duas quase sempre batem, mas divergem exatamente no
+    // caso que importa: equipe só de diaristas, onde o rateio é vazio porque
+    // o custo deles é a diária. Mostrar o produto ali diria que há comissão
+    // a pagar quando não há.
+    const valorProducao = ehAdmin
+      ? '(SELECT COALESCE(SUM(r.valor), 0) FROM producao_rateios r WHERE r.producaoId = p.id)'
+      : 'NULL'
+
+    const valorDiaria = ehAdmin ? 'd.valor' : 'NULL'
+
     return this.dataSource.query(
       `
       SELECT id, tipo, data, titulo, subtitulo, obra, valor, criadoEm FROM (
@@ -318,7 +347,7 @@ export class LancamentosService {
                ) AS titulo,
                COALESCE(f.nome, e.nome) AS subtitulo,
                o.nome AS obra,
-               NULL AS valor,
+               ${valorProducao} AS valor,
                p.criadoEm
           FROM producoes p
           JOIN servicos s        ON s.id = p.servicoId
@@ -329,7 +358,7 @@ export class LancamentosService {
 
         UNION ALL
 
-        SELECT d.id, 'diaria', d.data, 'Diária', f.nome, NULL, NULL, d.criadoEm
+        SELECT d.id, 'diaria', d.data, 'Diária', f.nome, NULL, ${valorDiaria}, d.criadoEm
           FROM diarias d
           JOIN funcionarios f ON f.id = d.funcionarioId
          WHERE d.criadoPor = ? AND d.data >= ?
