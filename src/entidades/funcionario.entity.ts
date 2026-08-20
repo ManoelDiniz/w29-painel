@@ -42,3 +42,26 @@ export class Funcionario {
   @CreateDateColumn({ type: 'datetime', precision: 3 })
   criadoEm!: Date
 }
+
+/**
+ * O que ESTA pessoa recebe NESTE serviço.
+ *
+ * Existe porque um valor único por funcionário não sobrevive à obra: o mesmo
+ * pedreiro ganha um tanto no reboco e outro na pintura. Sem esta tabela, a
+ * saída seria cadastrar a pessoa duas vezes — e aí o saldo dela fica
+ * partido em dois nomes no fechamento.
+ *
+ * Vale só no lançamento individual. Em equipe, todos dividem o valor do
+ * serviço em partes iguais.
+ */
+@Entity('funcionario_servicos')
+export class FuncionarioServico {
+  @PrimaryColumn({ type: 'char', length: 36 })
+  funcionarioId!: string
+
+  @PrimaryColumn({ type: 'char', length: 36 })
+  servicoId!: string
+
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  valor!: string
+}

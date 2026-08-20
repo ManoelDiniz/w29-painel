@@ -1,5 +1,7 @@
 import { Transform } from 'class-transformer'
+import { Type } from 'class-transformer'
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -12,6 +14,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator'
 
 import { paraNumero } from '../comum/dinheiro'
@@ -125,6 +128,17 @@ export class SalvarServicoDto {
 
 // ----------------------------------------------------------- funcionário
 
+/** Quanto esta pessoa recebe neste serviço. */
+export class ValorPorServicoDto {
+  @IsUUID('all', { message: 'Serviço inválido.' })
+  servicoId!: string
+
+  @Transform(dinheiroObrigatorio)
+  @Min(0, { message: 'Valor por serviço inválido. Use números, como 4,00.' })
+  @Max(999_999_999, { message: 'Valor por serviço grande demais.' })
+  valor!: number
+}
+
 export class SalvarFuncionarioDto {
   @Transform(({ value }) => String(value ?? '').trim())
   @MinLength(1, { message: 'O funcionário precisa de um nome.' })
@@ -143,6 +157,24 @@ export class SalvarFuncionarioDto {
   @Transform(dinheiroOuNulo)
   @Min(0, { message: 'Valor por produção inválido. Use números, como 4,00.' })
   valorProducao?: number | null
+
+  /**
+   * O que a pessoa recebe em cada serviço, quando lança sozinha.
+   *
+   * Só os serviços que DIFEREM precisam vir — o que não estiver aqui cai no
+   * valor geral dela e, faltando esse, no valor do serviço. Mandar a lista
+   * inteira também funciona; a tela faz assim porque é mais fácil de
+   * conferir de relance.
+   *
+   * O teto de 200 não é capricho: sem ele, um POST com dez mil linhas vira
+   * dez mil inserts numa transação só.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200, { message: 'Serviços demais de uma vez. Salve em partes.' })
+  @ValidateNested({ each: true })
+  @Type(() => ValorPorServicoDto)
+  valoresPorServico?: ValorPorServicoDto[]
 
   @IsOptional() @IsBoolean()
   ativo?: boolean

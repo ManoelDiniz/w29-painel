@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { randomUUID } from 'node:crypto'
-import { DataSource, Repository } from 'typeorm'
+import { DataSource, EntityManager, Repository } from 'typeorm'
 
 import type { UsuarioDaSessao } from '../auth/decoradores'
 import { ErroDeRegra } from '../comum/erros'
-import { Equipe, EquipeMembro, Funcionario, Obra, Servico } from '../entidades'
+import { Equipe, EquipeMembro, Funcionario, FuncionarioServico, Obra, Servico } from '../entidades'
 import type {
   SalvarEquipeDto,
   SalvarFuncionarioDto,
@@ -145,22 +145,113 @@ export class CadastrosService {
 
   // --------------------------------------------------------- funcionários
 
-  listarFuncionarios(): Promise<Funcionario[]> {
-    return this.funcionarios.find({ order: { ativo: 'DESC', nome: 'ASC' } })
+  /**
+   * Os funcionários, cada um com o que recebe em cada serviço.
+   *
+   * Duas consultas e uma junção em memória, e não um LEFT JOIN: com o join,
+   * uma pessoa com dez serviços vira dez linhas repetidas que eu teria de
+   * desdobrar de qualquer jeito. São dois SELECTs numa tabela que tem
+   * dezenas de linhas, não milhões.
+   */
+  async listarFuncionarios() {
+    const [funcionarios, valores] = await Promise.all([
+      this.funcionarios.find({ order: { ativo: 'DESC', nome: 'ASC' } }),
+      this.dataSource.getRepository(FuncionarioServico).find(),
+    ])
+
+    const porFuncionario = new Map<string, { servicoId: string; valor: string }[]>()
+    for (const v of valores) {
+      const lista = porFuncionario.get(v.funcionarioId) ?? []
+      lista.push({ servicoId: v.servicoId, valor: v.valor })
+      porFuncionario.set(v.funcionarioId, lista)
+    }
+
+    return funcionarios.map((f) => ({
+      ...f,
+      valoresPorServico: porFuncionario.get(f.id) ?? [],
+    }))
   }
 
-  criarFuncionario(dto: SalvarFuncionarioDto): Promise<Funcionario> {
-    return this.funcionarios.save(
-      this.funcionarios.create({ id: randomUUID(), ...this.camposDoFuncionario(dto) }),
-    )
+  async criarFuncionario(dto: SalvarFuncionarioDto): Promise<Funcionario> {
+    const id = randomUUID()
+
+    return this.dataSource.transaction(async (gerente) => {
+      const funcionario = await gerente
+        .getRepository(Funcionario)
+        .save(gerente.getRepository(Funcionario).create({ id, ...this.camposDoFuncionario(dto) }))
+
+      await this.gravarValoresPorServico(gerente, id, dto)
+      return funcionario
+    })
   }
 
   async atualizarFuncionario(id: string, dto: SalvarFuncionarioDto): Promise<Funcionario> {
-    const funcionario = await this.funcionarios.findOne({ where: { id } })
-    if (!funcionario) throw new NotFoundException({ erro: 'Funcionário não encontrado.' })
+    return this.dataSource.transaction(async (gerente) => {
+      const repo = gerente.getRepository(Funcionario)
 
-    Object.assign(funcionario, this.camposDoFuncionario(dto))
-    return this.funcionarios.save(funcionario)
+      const funcionario = await repo.findOne({ where: { id } })
+      if (!funcionario) throw new NotFoundException({ erro: 'Funcionário não encontrado.' })
+
+      Object.assign(funcionario, this.camposDoFuncionario(dto))
+      const salvo = await repo.save(funcionario)
+
+      await this.gravarValoresPorServico(gerente, id, dto)
+      return salvo
+    })
+  }
+
+  /**
+   * Reescreve a tabela de preços da pessoa.
+   *
+   * Apaga e refaz, como os membros de equipe: mandar a lista sem um serviço
+   * significa "não tenho valor próprio nele", e um UPDATE deixaria o preço
+   * antigo de pé — a pessoa continuaria recebendo um valor que o admin
+   * acabou de tirar da tela.
+   *
+   * Isso NÃO mexe em produção já lançada: o valor foi congelado na linha do
+   * lançamento no dia em que aconteceu. Mudar o preço hoje vale de hoje em
+   * diante, e é justamente por isso que o congelamento existe.
+   */
+  private async gravarValoresPorServico(
+    gerente: EntityManager,
+    funcionarioId: string,
+    dto: SalvarFuncionarioDto,
+  ): Promise<void> {
+    // O campo ausente significa "não mexi nisso" — comum quando outra tela
+    // salva o funcionário sem conhecer a lista de preços. Apagar aqui seria
+    // destruir dado que ninguém pediu para destruir.
+    if (dto.valoresPorServico === undefined) return
+
+    const repo = gerente.getRepository(FuncionarioServico)
+    await repo.delete({ funcionarioId })
+
+    // Diarista não tem preço por serviço: o custo dele é a diária. Deixar
+    // linhas aqui seria dinheiro parado esperando alguém trocar o regime e
+    // se surpreender.
+    if (dto.regime !== 'producao') return
+
+    // Duplicata no mesmo serviço quebraria a PK com um erro obscuro; fica o
+    // último, que é o que a tela mostrava quando o admin clicou em salvar.
+    const porServico = new Map<string, number>()
+    for (const v of dto.valoresPorServico) porServico.set(v.servicoId, v.valor)
+
+    if (porServico.size === 0) return
+
+    const ids = [...porServico.keys()]
+    const existentes = await gerente.getRepository(Servico).findBy(ids.map((id) => ({ id })))
+    if (existentes.length !== ids.length) {
+      throw new ErroDeRegra(
+        'Um dos serviços escolhidos não existe mais. Recarregue a página e tente de novo.',
+      )
+    }
+
+    await repo.insert(
+      ids.map((servicoId) => ({
+        funcionarioId,
+        servicoId,
+        valor: porServico.get(servicoId)!.toFixed(2),
+      })),
+    )
   }
 
   /**

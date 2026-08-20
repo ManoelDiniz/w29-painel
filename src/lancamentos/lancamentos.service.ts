@@ -11,6 +11,7 @@ import {
   Diaria,
   Equipe,
   Funcionario,
+  FuncionarioServico,
   Gasto,
   Obra,
   Producao,
@@ -160,13 +161,31 @@ export class LancamentosService {
         if (!equipe) throw new ErroDeRegra('Equipe não encontrada ou inativa.')
       }
 
-      // O preço da mão de obra é do funcionário quando ele tem um próprio;
-      // senão, é o do serviço. É como um comissionado negocia um valor
-      // melhor sem virar exceção no cadastro do serviço.
-      const valorMaoObraUnit =
-        funcionario?.regime === 'producao' && funcionario.valorProducao !== null
-          ? funcionario.valorProducao
-          : servico.valorMaoObra
+      // ---------------------------------------------- quanto vale a mão de obra
+      //
+      // Lançamento de EQUIPE usa o valor do serviço, e o rateio divide em
+      // partes iguais: quem trabalha junto divide o mesmo bolo. O valor
+      // combinado com cada pessoa vale quando ela lança sozinha.
+      //
+      // Sozinha, a busca desce do mais específico para o mais genérico:
+      //
+      //   1. o valor DESTA pessoa NESTE serviço
+      //   2. o valor geral dela
+      //   3. o valor do serviço
+      //
+      // A ordem importa porque o número mais específico é sempre o que
+      // alguém combinou por último — e um genérico sobrepondo um combinado
+      // paga errado sem ninguém perceber até o fechamento.
+      let valorMaoObraUnit = servico.valorMaoObra
+
+      if (funcionario?.regime === 'producao') {
+        const doServico = await gerente.findOne(FuncionarioServico, {
+          where: { funcionarioId: funcionario.id, servicoId: servico.id },
+        })
+
+        valorMaoObraUnit =
+          doServico?.valor ?? funcionario.valorProducao ?? servico.valorMaoObra
+      }
 
       const producaoId = randomUUID()
 

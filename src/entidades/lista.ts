@@ -1,7 +1,7 @@
 import { CategoriaGasto, Gasto } from './gasto.entity'
 import { Diaria } from './diaria.entity'
 import { Equipe, EquipeMembro } from './equipe.entity'
-import { Funcionario } from './funcionario.entity'
+import { Funcionario, FuncionarioServico } from './funcionario.entity'
 import { Obra } from './obra.entity'
 import { Pagamento } from './pagamento.entity'
 import { Producao, ProducaoRateio } from './producao.entity'
@@ -20,6 +20,7 @@ import { Usuario } from './usuario.entity'
 export const TODAS_ENTIDADES = [
   Usuario,
   Funcionario,
+  FuncionarioServico,
   Equipe,
   EquipeMembro,
   Servico,
