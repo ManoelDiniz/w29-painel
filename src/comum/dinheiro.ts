@@ -8,8 +8,19 @@
  * para decimal só na hora de gravar.
  */
 
-/** 'R$ 1.234,56' | '1234.56' | '1.234,56' -> 1234.56 (ou null). */
-export function paraNumero(texto: string): number | null {
+/**
+ * Interpreta um número escrito por gente: 'R$ 1.234,56' -> 1234.56.
+ *
+ * Ele APENAS interpreta. Não recusa zero, não recusa negativo — quem cuida
+ * de faixa são os @Min/@Max dos DTOs, que sabem o que cada campo aceita
+ * (quantidade > 0, valor por serviço >= 0).
+ *
+ * O nome é `interpretarNumero` e não `paraNumero` de propósito: o front tem
+ * um `paraNumero` que RECUSA zero e negativo. Dois nomes iguais com
+ * contratos diferentes nos dois lados do projeto era um convite a mover
+ * código de um para o outro e mudar a regra sem perceber.
+ */
+export function interpretarNumero(texto: string): number | null {
   const limpo = texto.replace(/[^\d,.-]/g, '').trim()
   if (limpo === '') return null
 

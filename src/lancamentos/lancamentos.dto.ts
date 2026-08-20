@@ -15,7 +15,7 @@ import {
 } from 'class-validator'
 
 import { dataValida } from '../comum/datas'
-import { paraNumero } from '../comum/dinheiro'
+import { interpretarNumero } from '../comum/dinheiro'
 import { TIPOS_EXECUTOR, type TipoExecutor } from '../entidades'
 
 @ValidatorConstraint({ name: 'dataISO' })
@@ -38,7 +38,7 @@ class DataISO implements ValidatorConstraintInterface {
  */
 const paraDecimalOuNaN = ({ value }: { value: unknown }) => {
   if (typeof value === 'number') return value
-  const n = paraNumero(String(value ?? ''))
+  const n = interpretarNumero(String(value ?? ''))
   return n === null ? Number.NaN : n
 }
 

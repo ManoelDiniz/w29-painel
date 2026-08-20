@@ -10,7 +10,9 @@
     "lint": "eslint \"src/**/*.ts\"",
     "migracao:rodar": "typeorm-ts-node-commonjs migration:run -d src/config/fonte-dados.ts",
     "migracao:voltar": "typeorm-ts-node-commonjs migration:revert -d src/config/fonte-dados.ts",
-    "semente": "ts-node src/config/semente.ts"
+    "semente": "ts-node src/config/semente.ts",
+    "teste": "vitest run",
+    "teste:olho": "vitest"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
@@ -38,6 +40,7 @@
     "@types/express": "^5.0.5",
     "@types/node": "^20.19.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

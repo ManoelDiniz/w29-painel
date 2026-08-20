@@ -17,7 +17,7 @@ import {
   ValidateNested,
 } from 'class-validator'
 
-import { paraNumero } from '../comum/dinheiro'
+import { interpretarNumero } from '../comum/dinheiro'
 import { REGIMES, STATUS_OBRA, UNIDADES, type Regime, type StatusObra, type Unidade } from '../entidades'
 
 /** Texto que, vazio, vira null — e não string vazia guardada no banco. */
@@ -30,13 +30,13 @@ const textoOuNulo = ({ value }: { value: unknown }) => {
 const dinheiroOuNulo = ({ value }: { value: unknown }) => {
   if (value === null || value === undefined || String(value).trim() === '') return null
   if (typeof value === 'number') return value
-  const n = paraNumero(String(value))
+  const n = interpretarNumero(String(value))
   return n === null ? Number.NaN : n
 }
 
 const dinheiroObrigatorio = ({ value }: { value: unknown }) => {
   if (typeof value === 'number') return value
-  const n = paraNumero(String(value ?? ''))
+  const n = interpretarNumero(String(value ?? ''))
   return n === null ? Number.NaN : n
 }
 
