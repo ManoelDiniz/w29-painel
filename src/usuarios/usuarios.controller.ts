@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 
 import { AuthService } from '../auth/auth.service'
-import { CadastrarDto } from '../auth/auth.dto'
+import { CriarUsuarioDto } from '../auth/auth.dto'
 import { SoAdmin, UsuarioAtual, type UsuarioDaSessao } from '../auth/decoradores'
 import { DefinirAtivoDto } from '../cadastros/cadastros.dto'
 import { ErroDeRegra } from '../comum/erros'
@@ -34,16 +34,17 @@ export class UsuariosController {
   }
 
   /**
-   * Cria um operador.
+   * Cria um usuário — operador ou administrador, à escolha de quem chama.
    *
-   * O papel não é escolhido: quem chega por aqui é sempre operador. Ninguém
-   * vira admin por um campo de formulário — para promover alguém é preciso
-   * um UPDATE no banco, que é um ato deliberado e deixa rastro.
+   * A escolha do cargo é segura aqui porque a classe inteira é @SoAdmin():
+   * quem chega nesta rota já é administrador. O que continua proibido é o
+   * cadastro PÚBLICO escolher cargo, e isso é garantido lá, por um DTO que
+   * simplesmente não tem o campo.
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  criar(@Body() dto: CadastrarDto) {
-    return this.auth.criarOperador(dto)
+  criar(@Body() dto: CriarUsuarioDto) {
+    return this.auth.criarUsuario(dto)
   }
 
   /**

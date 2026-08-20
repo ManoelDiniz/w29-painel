@@ -1,5 +1,7 @@
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator'
+import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import { Transform } from 'class-transformer'
+
+import { PAPEIS, type Papel } from '../entidades'
 
 /**
  * As mensagens são as que aparecem na tela. Escrevê-las aqui, junto da
@@ -35,4 +37,23 @@ export class CadastrarDto {
   @MinLength(6, { message: 'A senha precisa ter pelo menos 6 caracteres.' })
   @MaxLength(72, { message: 'A senha pode ter no máximo 72 caracteres.' })
   senha!: string
+}
+
+/**
+ * O que o ADMIN manda ao criar alguém por /api/usuarios.
+ *
+ * A diferença para o CadastrarDto é uma só, e é a que importa: aqui existe
+ * `papel`. No cadastro público ele não existe de propósito — qualquer pessoa
+ * poderia se inscrever pedindo 'admin', e o `whitelist: true` do
+ * ValidationPipe descarta o campo caladamente se alguém tentar.
+ *
+ * Aqui o campo é seguro porque a rota já passou pelo @SoAdmin(): quem escolhe
+ * o cargo já é administrador. Negar isso não protegeria nada — só obrigaria
+ * a promover gente por UPDATE no MySQL, que é pior: sem tela, sem validação
+ * e sem ninguém lembrando de conferir depois.
+ */
+export class CriarUsuarioDto extends CadastrarDto {
+  @IsOptional()
+  @IsIn(PAPEIS, { message: 'Cargo inválido. Escolha administrador ou operador.' })
+  papel?: Papel
 }

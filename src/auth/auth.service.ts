@@ -8,7 +8,7 @@ import { DataSource, Repository } from 'typeorm'
 import { ErroDeRegra } from '../comum/erros'
 import { Usuario } from '../entidades'
 import type { UsuarioDaSessao } from './decoradores'
-import type { CadastrarDto, EntrarDto } from './auth.dto'
+import type { CadastrarDto, CriarUsuarioDto, EntrarDto } from './auth.dto'
 import type { Conteudo } from './sessao.guard'
 
 /**
@@ -91,14 +91,20 @@ export class AuthService {
   }
 
   /**
-   * O admin cria um operador.
+   * O admin cria alguém — operador ou outro administrador.
    *
-   * Diferente do cadastro público em dois pontos: o papel é sempre
-   * 'operador' (mesmo que este seja o primeiro usuário — não é, já que só
-   * um admin logado chega aqui), e nenhum token é devolvido. Devolver um
-   * token aqui derrubaria a sessão do admin se o front resolvesse guardá-lo.
+   * O papel vem do formulário AQUI, e só aqui. No cadastro público ele não
+   * existe: qualquer um se inscreveria pedindo 'admin'. Nesta rota quem
+   * escolhe já passou pelo @SoAdmin(), então a escolha é dele por direito.
+   *
+   * O padrão continua sendo 'operador' — quem esquecer de mandar o campo
+   * cria a conta menos poderosa, não a mais.
+   *
+   * Nenhum token é devolvido: devolver um aqui derrubaria a sessão do admin
+   * se o front resolvesse guardá-lo, e ele viraria o usuário que acabou de
+   * criar.
    */
-  async criarOperador(dto: CadastrarDto): Promise<UsuarioDaSessao> {
+  async criarUsuario(dto: CriarUsuarioDto): Promise<UsuarioDaSessao> {
     const jaExiste = await this.usuarios.exists({ where: { email: dto.email } })
     if (jaExiste) {
       throw new ErroDeRegra('Já existe uma conta com esse e-mail.')
@@ -110,7 +116,7 @@ export class AuthService {
         nome: dto.nome,
         email: dto.email,
         senhaHash: await bcrypt.hash(dto.senha, CUSTO_HASH),
-        papel: 'operador',
+        papel: dto.papel ?? 'operador',
         ativo: true,
       }),
     )
