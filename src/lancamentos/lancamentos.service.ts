@@ -130,7 +130,7 @@ export class LancamentosService {
       throw new ErroDeRegra(
         dto.tipoExecutor === 'funcionario'
           ? 'Escolha quem fez o serviço.'
-          : 'Escolha a equipe que fez o serviço.',
+          : 'Escolha a turma que fez o serviço.',
       )
     }
 

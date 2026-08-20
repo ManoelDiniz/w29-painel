@@ -57,7 +57,7 @@ export class LancarProducaoDto {
   @Max(9_999_999_999, { message: 'Quantidade grande demais. Confira o que foi digitado.' })
   quantidade!: number
 
-  @IsIn(TIPOS_EXECUTOR, { message: 'Escolha quem fez o serviço.' })
+  @IsIn(TIPOS_EXECUTOR, { message: 'Escolha a turma.' })
   tipoExecutor!: TipoExecutor
 
   /**
@@ -67,7 +67,7 @@ export class LancarProducaoDto {
    * explica melhor o que fazer do que dois erros de campo soltos.
    */
   @IsOptional()
-  @IsUUID('all', { message: 'Escolha quem fez o serviço.' })
+  @IsUUID('all', { message: 'Escolha a turma.' })
   funcionarioId?: string
 
   @IsOptional()
