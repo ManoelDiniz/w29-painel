@@ -60,6 +60,28 @@ export class AuthController {
   }
 
   /**
+   * Renovar a sessão — o que mantém o celular do operador conectado.
+   *
+   * Exige sessão válida de propósito: renovar não é uma segunda porta de
+   * entrada, é esticar uma porta que já está aberta. Token vencido não
+   * renova nada; a pessoa entra de novo com e-mail e senha.
+   *
+   * O token novo sai no cookie E no corpo, pelo mesmo motivo do /entrar:
+   * o navegador usa o cookie, e o front do Next guarda o do corpo no
+   * cookie de primeira parte dele.
+   */
+  @Post('renovar')
+  @HttpCode(HttpStatus.OK)
+  async renovar(
+    @UsuarioAtual() usuario: UsuarioDaSessao,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = await this.auth.renovar(usuario)
+    gravarCookieSessao(res, token)
+    return { usuario, token }
+  }
+
+  /**
    * Quem sou eu. O front chama isto no carregamento para saber se mostra a
    * tela do admin, a do operador, ou manda para o login.
    */

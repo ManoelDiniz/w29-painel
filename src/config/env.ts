@@ -53,7 +53,19 @@ export const env = {
 
   jwt: {
     segredo,
-    validade: opcional('JWT_VALIDADE', '7d'),
+    /**
+     * Quanto vale um token recém-assinado.
+     *
+     * Trinta dias porque o front renova a sessão sozinho enquanto a pessoa
+     * usa o app (POST /auth/renovar): quem abre o app na obra toda semana
+     * nunca mais vê a tela de login. O número aqui é, na prática, quanto
+     * tempo alguém pode ficar SEM abrir o app antes de precisar entrar de
+     * novo — não é quanto tempo a sessão dura.
+     *
+     * Prazo longo não vira acesso eterno: o SessaoGuard lê o banco a cada
+     * requisição, então desativar a conta corta a sessão na hora.
+     */
+    validade: opcional('JWT_VALIDADE', '30d'),
   },
 
   // Vazio = front e API em domínios diferentes (o caso Vercel + VPS).

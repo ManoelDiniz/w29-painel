@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { DataSource, Repository } from 'typeorm'
 
 import { ErroDeRegra } from '../comum/erros'
-import { Usuario } from '../entidades'
+import { Usuario, type Papel } from '../entidades'
 import type { UsuarioDaSessao } from './decoradores'
 import type { CadastrarDto, CriarUsuarioDto, EntrarDto } from './auth.dto'
 import type { Conteudo } from './sessao.guard'
@@ -124,12 +124,33 @@ export class AuthService {
     return this.paraSessao(usuario)
   }
 
+  /**
+   * Renova a sessão de quem já está dentro.
+   *
+   * Não pede senha de novo, e não precisa: quem chega aqui passou pelo
+   * SessaoGuard, que conferiu a assinatura do token atual e leu no banco
+   * que a conta continua ativa. O que sai é o mesmo conteúdo com
+   * vencimento novo, contado a partir de agora.
+   *
+   * É isto que mantém o operador conectado no celular: o app renova
+   * sozinho enquanto ele usa, e a sessão só morre de verdade quando ele
+   * passa uma validade inteira sem abrir o app — ou quando o admin
+   * desativa a conta, que o guard vê na requisição seguinte.
+   */
+  renovar(usuario: UsuarioDaSessao): Promise<string> {
+    return this.assinarConteudo(usuario.id, usuario.papel)
+  }
+
   private paraSessao(u: Usuario): UsuarioDaSessao {
     return { id: u.id, nome: u.nome, email: u.email, papel: u.papel }
   }
 
   private assinar(u: Usuario): Promise<string> {
-    const conteudo: Conteudo = { sub: u.id, papel: u.papel }
+    return this.assinarConteudo(u.id, u.papel)
+  }
+
+  private assinarConteudo(id: string, papel: Papel): Promise<string> {
+    const conteudo: Conteudo = { sub: id, papel }
     return this.jwt.signAsync(conteudo)
   }
 }
