@@ -57,3 +57,39 @@ export class CriarUsuarioDto extends CadastrarDto {
   @IsIn(PAPEIS, { message: 'Cargo inválido. Escolha administrador ou operador.' })
   papel?: Papel
 }
+
+/**
+ * O que o admin pode mudar numa conta que já existe.
+ *
+ * Não herda de CriarUsuarioDto porque a senha muda de natureza: lá ela é
+ * obrigatória (a conta precisa nascer com uma), e aqui campo vazio quer
+ * dizer "não mexa na senha" — que é o caso normal, já que quase toda
+ * edição é para corrigir um nome escrito errado.
+ */
+export class AtualizarUsuarioDto {
+  @Transform(({ value }) => String(value ?? '').trim())
+  @IsString({ message: 'Diga o nome da pessoa.' })
+  @MinLength(1, { message: 'Diga o nome da pessoa.' })
+  @MaxLength(160, { message: 'O nome ficou longo demais.' })
+  nome!: string
+
+  @Transform(({ value }) => String(value ?? '').trim().toLowerCase())
+  @IsEmail({}, { message: 'E-mail inválido.' })
+  email!: string
+
+  @IsOptional()
+  @IsIn(PAPEIS, { message: 'Cargo inválido. Escolha administrador ou operador.' })
+  papel?: Papel
+
+  // Vazio vira `undefined` e não string vazia: sem isto o @MinLength
+  // reprovaria quem só quis trocar o nome e deixou a senha em branco.
+  @Transform(({ value }) => {
+    const v = String(value ?? '').trim()
+    return v === '' ? undefined : v
+  })
+  @IsOptional()
+  @IsString({ message: 'Senha inválida.' })
+  @MinLength(6, { message: 'A nova senha precisa ter pelo menos 6 caracteres.' })
+  @MaxLength(72, { message: 'A senha pode ter no máximo 72 caracteres.' })
+  senha?: string
+}

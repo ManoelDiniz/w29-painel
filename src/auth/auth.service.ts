@@ -8,7 +8,7 @@ import { DataSource, Repository } from 'typeorm'
 import { ErroDeRegra } from '../comum/erros'
 import { Usuario, type Papel } from '../entidades'
 import type { UsuarioDaSessao } from './decoradores'
-import type { CadastrarDto, CriarUsuarioDto, EntrarDto } from './auth.dto'
+import type { AtualizarUsuarioDto, CadastrarDto, CriarUsuarioDto, EntrarDto } from './auth.dto'
 import type { Conteudo } from './sessao.guard'
 
 /**
@@ -122,6 +122,48 @@ export class AuthService {
     )
 
     return this.paraSessao(usuario)
+  }
+
+  /**
+   * O admin corrige uma conta: nome, e-mail, cargo, senha.
+   *
+   * Senha em branco não é senha vazia — é "não mexa nela". Quem está só
+   * arrumando um nome escrito errado não devia precisar inventar uma senha
+   * nova e avisar a pessoa.
+   *
+   * Trocar a senha NÃO derruba quem já está logado: o token assinado
+   * continua valendo até vencer. Para cortar o acesso na hora, o caminho é
+   * desativar a conta — aí o guard recusa na requisição seguinte.
+   */
+  async atualizarUsuario(id: string, dto: AtualizarUsuarioDto): Promise<UsuarioDaSessao> {
+    const usuario = await this.usuarios.findOne({
+      where: { id },
+      select: ['id', 'nome', 'email', 'papel'],
+    })
+    if (!usuario) throw new ErroDeRegra('Usuário não encontrado.')
+
+    // O unique do banco também barraria, mas com uma mensagem em inglês
+    // sobre índice violado. Esta chega em português na tela.
+    const comEsseEmail = await this.usuarios.findOne({
+      where: { email: dto.email },
+      select: ['id'],
+    })
+    if (comEsseEmail && comEsseEmail.id !== id) {
+      throw new ErroDeRegra('Já existe uma conta com esse e-mail.')
+    }
+
+    const mudancas: Partial<Usuario> = { nome: dto.nome, email: dto.email }
+    if (dto.papel) mudancas.papel = dto.papel
+    if (dto.senha) mudancas.senhaHash = await bcrypt.hash(dto.senha, CUSTO_HASH)
+
+    await this.usuarios.update({ id }, mudancas)
+
+    return {
+      id,
+      nome: dto.nome,
+      email: dto.email,
+      papel: dto.papel ?? usuario.papel,
+    }
   }
 
   /**

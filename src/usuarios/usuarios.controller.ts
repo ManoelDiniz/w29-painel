@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 
 import { AuthService } from '../auth/auth.service'
-import { CriarUsuarioDto } from '../auth/auth.dto'
+import { AtualizarUsuarioDto, CriarUsuarioDto } from '../auth/auth.dto'
 import { SoAdmin, UsuarioAtual, type UsuarioDaSessao } from '../auth/decoradores'
 import { DefinirAtivoDto } from '../cadastros/cadastros.dto'
 import { ErroDeRegra } from '../comum/erros'
@@ -45,6 +45,34 @@ export class UsuariosController {
   @HttpCode(HttpStatus.CREATED)
   criar(@Body() dto: CriarUsuarioDto) {
     return this.auth.criarUsuario(dto)
+  }
+
+  /**
+   * Corrige uma conta: nome, e-mail, cargo e — se quiser — a senha.
+   *
+   * A tela precisava disto por um motivo bem terra a terra: e-mail digitado
+   * errado no cadastro trancava a pessoa para fora, e a única saída era
+   * criar outra conta e abandonar a primeira. Senha nova também é pedido
+   * toda semana — operador que esqueceu a dele não tem como se recuperar
+   * sozinho, porque não existe "esqueci minha senha" por e-mail aqui.
+   */
+  @Put(':id')
+  atualizar(
+    @Param('id') id: string,
+    @Body() dto: AtualizarUsuarioDto,
+    @UsuarioAtual() usuario: UsuarioDaSessao,
+  ) {
+    // Rebaixar a si mesmo é o caminho curto para o sistema ficar sem
+    // administrador nenhum — e sem admin não há tela que conserte, só
+    // UPDATE no MySQL. Como só admin chega aqui e ninguém se rebaixa,
+    // sempre sobra pelo menos um.
+    if (id === usuario.id && dto.papel && dto.papel !== usuario.papel) {
+      throw new ErroDeRegra(
+        'Você não pode mudar o próprio cargo. Peça a outro administrador.',
+      )
+    }
+
+    return this.auth.atualizarUsuario(id, dto)
   }
 
   /**
