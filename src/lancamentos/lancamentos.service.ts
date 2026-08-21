@@ -279,12 +279,12 @@ export class LancamentosService {
   }
 
   async lancarGasto(dto: LancarGastoDto, usuario: UsuarioDaSessao): Promise<{ id: string }> {
-    this.recusarDataFutura(dto.data, 'gasto')
+    this.recusarDataFutura(dto.data, 'despesa')
 
     const categoria = await this.categorias.findOne({
       where: { id: dto.categoriaId, ativo: true },
     })
-    if (!categoria) throw new ErroDeRegra('Categoria de gasto não encontrada.')
+    if (!categoria) throw new ErroDeRegra('Categoria de despesa não encontrada.')
 
     const obra = await this.obras.findOne({ where: { id: dto.obraId } })
     if (!obra) throw new ErroDeRegra('Obra não encontrada.')
